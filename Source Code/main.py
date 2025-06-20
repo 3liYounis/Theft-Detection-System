@@ -1,5 +1,4 @@
 from Input.input_stream import input_stream, get_stream
-from Suppressing.suppressor import suppress_output
 from Behaveioral.detect_theft import detect_theft
 from Recognition.recognize_face import recognize_face
 from Detection.detect_item import detect_item
