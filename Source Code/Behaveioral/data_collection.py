@@ -42,8 +42,8 @@ def collect_data(video_path, label, output_csv):
 
 
 if __name__ == "__main__":
-    normal_dir = "./Data/Stream/Normal1"
-    shoplifting_dir = "./Data/Stream/Shoplifting1"
+    normal_dir = "./Data/Stream/Normal"
+    shoplifting_dir = "./Data/Stream/Shoplifting"
     output_csv = "pose_data.csv"
 
     # Process all videos in normal_dir with label=0
