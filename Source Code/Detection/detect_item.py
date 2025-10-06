@@ -1,28 +1,49 @@
-import cv2, time, json, yaml, math
+import cv2
+import time
+import json
+import yaml
 import numpy as np
 import onnxruntime as ort
 from pathlib import Path
 
-MODEL   = Path(r"runs/detect/shop15_det10/weights/best.onnx")
-DATA    = Path(r"datasets/products_ds/data.yaml")
-CODES   = Path(r"datasets/products_ds/barcodes-price.json")
-CAM     = 3
-SIZE    = 640
-THR     = 0.80
+MODEL = Path(r"runs/detect/shop15_det10/weights/best.onnx")
+DATA = Path(r"datasets/products_ds/data.yaml")
+CODES = Path(r"datasets/products_ds/barcodes-price.json")
+CAM = 3
+SIZE = 640
+THR = 0.80
 
 # --- load meta ---
-names = yaml.safe_load(DATA.read_text())["names"]
-codes = json.loads(CODES.read_text())      # str-key dict
+names = None
+codes = None
+sess = None
 
-# --- ORT session ---
-sess = ort.InferenceSession(
-    MODEL.as_posix(),
-    providers=["DmlExecutionProvider", "CPUExecutionProvider"]
-)
-print("Providers:", sess.get_providers())
+
+def _lazy_load_item_engine():
+    global names, codes, sess
+    if names is None or codes is None:
+        try:
+            names = yaml.safe_load(DATA.read_text()).get("names", [])
+        except Exception:
+            names = []
+        try:
+            codes = json.loads(CODES.read_text())
+        except Exception:
+            codes = {}
+    if sess is None:
+        try:
+            sess = ort.InferenceSession(
+                MODEL.as_posix(),
+                providers=["DmlExecutionProvider", "CPUExecutionProvider"]
+            )
+            # print("Providers:", sess.get_providers())
+        except Exception:
+            sess = None
 
 # --- helper: integer-precise letterbox ---
-def letterbox(im, new=640, color=(114,114,114)):
+
+
+def letterbox(im, new=640, color=(114, 114, 114)):
     h0, w0 = im.shape[:2]
     # scale ratio
     r = min(new / h0, new / w0)
@@ -44,8 +65,13 @@ def letterbox(im, new=640, color=(114,114,114)):
     return im, r, pad_x, pad_y
 
 # --- main detection function --------------------------------------
+
+
 def detect_products(frame):
     """Return list of dicts: name, barcode, price, conf, bbox."""
+    _lazy_load_item_engine()
+    if sess is None or not codes:
+        return []
     # 1) letterbox + blob
     img, r, pad_x, pad_y = letterbox(frame, SIZE)
     blob = img[:, :, ::-1].transpose(2, 0, 1)[None].astype(np.float32) / 255
@@ -75,11 +101,15 @@ def detect_products(frame):
 
         cls = int(cls)
         # undo integer padding & scaling
-        x1 = (x1 - pad_x) / r;  y1 = (y1 - pad_y) / r
-        x2 = (x2 - pad_x) / r;  y2 = (y2 - pad_y) / r
+        x1 = (x1 - pad_x) / r
+        y1 = (y1 - pad_y) / r
+        x2 = (x2 - pad_x) / r
+        y2 = (y2 - pad_y) / r
         box = tuple(map(int, (x1, y1, x2, y2)))
 
-        info = codes[str(cls)]
+        info = codes.get(str(cls))
+        if not info:
+            continue
         out.append({
             "name":    info["name"],
             "barcode": info["barcode"],
@@ -89,10 +119,10 @@ def detect_products(frame):
         })
 
     # 4) Non-Maximum Suppression
-    boxes  = [d['bbox'] for d in out]    # [(x1,y1,x2,y2), …]
-    scores = [d['conf']   for d in out]  # [0.87, 0.45, …]
-    rects  = [[x1, y1, x2 - x1, y2 - y1] for x1,y1,x2,y2 in boxes]
-    idxs   = cv2.dnn.NMSBoxes(rects, scores, THR, 0.45)
+    boxes = [d['bbox'] for d in out]    # [(x1,y1,x2,y2), …]
+    scores = [d['conf'] for d in out]  # [0.87, 0.45, …]
+    rects = [[x1, y1, x2 - x1, y2 - y1] for x1, y1, x2, y2 in boxes]
+    idxs = cv2.dnn.NMSBoxes(rects, scores, THR, 0.45)
 
     keep = []
     if idxs is not None and len(idxs) > 0:
@@ -100,14 +130,17 @@ def detect_products(frame):
             keep = idxs.flatten().tolist()
         else:
             for i in idxs:
-                keep.append(i[0] if isinstance(i, (list,tuple, np.ndarray)) else i)
+                keep.append(i[0] if isinstance(
+                    i, (list, tuple, np.ndarray)) else i)
 
     filtered = [out[i] for i in keep] if keep else out
     return filtered
 
-# --- live inference loop -------------------------------------------
-def detect_item(theft_recording):
-    cap = cv2.VideoCapture(CAM, cv2.CAP_DSHOW)
+# --- live inference loop (camera) -----------------------------------
+
+
+def detect_item_live(camera_index=CAM):
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     print("Press q to quit")
     while True:
         ok, frame = cap.read()
@@ -119,15 +152,15 @@ def detect_item(theft_recording):
 
         # draw
         for det in dets:
-            x1,y1,x2,y2 = det["bbox"]
+            x1, y1, x2, y2 = det["bbox"]
             label = f"{det['name']} {det['conf']*100:.1f}%  ₪{det['price']}"
-            cv2.rectangle(frame, (x1,y1), (x2,y2), (0,255,0), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
         fps = 1 / (time.time() - t0)
-        cv2.putText(frame, f"{fps:.1f} FPS", (20,35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+        cv2.putText(frame, f"{fps:.1f} FPS", (20, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         cv2.imshow("Shop live", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -136,4 +169,36 @@ def detect_item(theft_recording):
     cv2.destroyAllWindows()
 
 
-detect_item(None)
+# --- offline inference from video -----------------------------------
+def detect_items_from_video(video_path, max_frames=200):
+    """Process a recorded video and return aggregated detected items.
+
+    Returns: list of dicts {name, barcode, price, conf} (deduped by barcode, max conf)
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return []
+
+    best_by_barcode = {}
+    frames = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        frames += 1
+        dets = detect_products(frame)
+        for det in dets:
+            key = det["barcode"]
+            prev = best_by_barcode.get(key)
+            if prev is None or det["conf"] > prev["conf"]:
+                best_by_barcode[key] = {
+                    "name": det["name"],
+                    "barcode": det["barcode"],
+                    "price": det["price"],
+                    "conf": det["conf"]
+                }
+        if max_frames and frames >= max_frames:
+            break
+
+    cap.release()
+    return list(best_by_barcode.values())
