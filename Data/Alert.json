@@ -1,19 +1,9 @@
 {
-    "theft link": "D:\\FinalProject\\Final-BS.C-Project-2025\\Data\\Stream\\stream.mp4",
-    "item": [
-        {
-            "Item_Name": "banana",
-            "Item Price": " 11$ "
-        },
-        {
-            "Item_Name": "apple",
-            "Item Price": " 10$ "
-        }
-    ],
-    "face ID": [
-        "D:\\FinalProject\\Final-BS.C-Project-2025\\Data\\Faces\\Ali.png",
-        "D:\\FinalProject\\Final-BS.C-Project-2025\\Data\\Faces\\Mahdi.png",
-        "D:\\FinalProject\\Final-BS.C-Project-2025\\Data\\Faces\\Yazan.png"
-    ],
-    "theft time": "Friday, 2025-05-09 23:07:31"
+    "theft link": "./Data/Stream/Shoplifting/Shoplifting (1).mp4",
+    "item": [],
+    "face ID": {
+        "match": "Unknown",
+        "score": 0.0
+    },
+    "theft time": "Monday, 2025-10-06 12:59:31"
 }
