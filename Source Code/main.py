@@ -1,5 +1,5 @@
+# from Behaveioral.deprecated_detect_theft import detect_theft
 from Input.input_stream import input_stream, get_stream
-from Behaveioral.deprecated_detect_theft import detect_theft
 from Behaveioral.behavior_classifier_infer import detect_theft_ml
 from Recognition.recognize_face import recognize_face
 from Detection.detect_item import detect_items_from_video
@@ -13,13 +13,15 @@ def run_pipeline():
     stream = get_stream()
 
     # We'll just use the file path used by get_stream
-    theft_video_path = "./Data/Stream/Shoplifting/Shoplifting (1).mp4"
+    theft_video_path = "./Data/Stream/Shoplifting - Test/Shoplifting (92).mp4"
+    # theft_video_path = "./Data/Stream/Normal - Test/Normal (93).mp4"
     # theft_video_path = "./Data/Stream/Random/ali_hair.mp4"
     # theft_video_path = "./Data/Stream/Random/yazan.mp4"
     # theft_video_path = "./Data/Stream/Random/hamza.mp4"
     # theft_video_path = "./Data/Stream/Normal/Normal (66).mp4"
     # theft_video_path = "./Data/Stream/Normal/Normal (27).mp4"
     # theft_video_path = "./Data/Stream/Normal/Normal (87).mp4"
+    # theft_video_path = "./Data/Stream/Shoplifting/Shoplifting (17).mp4"
 
     # 1) ML-based decision (pose classifier)
     ml_info = detect_theft_ml(
@@ -30,13 +32,14 @@ def run_pipeline():
         visualize=True,     # show live window with overlays
         save_path=None      # do not save
     )
+    theft_decision = ml_info.get("theft")
     # 2) FSM-based decision (pose + product overlap)
     # fsm_info = detect_theft(theft_video_path)
+    # theft_decision = fsm_info.get("theft")
 
-    theft_decision = ml_info.get("theft")
     if not theft_decision:
         # print("No theft detected. ML:", ml_info, "FSM:", fsm_info)
-        print("No theft detected. ML:", ml_info)
+        print("No theft detected:", ml_info)
         return
 
     items = detect_items_from_video(theft_video_path)

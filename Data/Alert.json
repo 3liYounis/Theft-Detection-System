@@ -1,9 +1,9 @@
 {
-    "theft link": "./Data/Stream/Shoplifting/Shoplifting (1).mp4",
+    "theft link": "./Data/Stream/Shoplifting - Test/Shoplifting (92).mp4",
     "item": [],
     "face ID": {
-        "match": "Unknown",
-        "score": 0.0
+        "match": "2.jpg",
+        "score": 0.7482225894927979
     },
-    "theft time": "Thursday, 2025-10-09 19:27:18"
+    "theft time": "Sunday, 2025-10-12 10:39:12"
 }

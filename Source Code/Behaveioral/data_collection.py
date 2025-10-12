@@ -3,21 +3,16 @@ import mediapipe as mp
 import numpy as np
 import csv
 import os
-
-# Try to use MediaPipe Tasks multi-pose; fallback to single-pose if not available
 try:
     from mediapipe.tasks import python as mp_python
     from mediapipe.tasks.python import vision as mp_vision
     MP_TASKS_AVAILABLE = True
 except Exception:
     MP_TASKS_AVAILABLE = False
-
-# Default path for the multi-pose task model (we will download it here)
 MODEL_TASK_PATH = "./Resources/Models/pose_landmarker_full.task"
 
 
 def extract_pose_features(pose_landmarks):
-    # Extract normalized landmark coordinates as flat array (x1,y1,z1,x2,y2,z2,...)
     features = []
     for lm in pose_landmarks.landmark:
         features.extend([lm.x, lm.y, lm.z])
@@ -25,18 +20,14 @@ def extract_pose_features(pose_landmarks):
 
 
 def extract_pose_features_from_list(landmarks_list):
-    # For MediaPipe Tasks: list[NormalizedLandmark]
     features = []
     for lm in landmarks_list:
-        # Some models may not output z; guard with getattr
         features.extend([lm.x, lm.y, getattr(lm, 'z', 0.0)])
     return features
 
 
 def collect_data(video_path, label, output_csv):
     video = cv2.VideoCapture(video_path)
-
-    # Set up detector: multipose if available, else single-pose
     detector = None
     single_pose = None
     if MP_TASKS_AVAILABLE:
@@ -53,7 +44,6 @@ def collect_data(video_path, label, output_csv):
             detector = mp_vision.PoseLandmarker.create_from_options(options)
         except Exception:
             detector = None
-    # Ensure single-pose fallback if detector is unavailable for any reason
     if detector is None:
         single_pose = mp.solutions.pose.Pose(min_detection_confidence=0.5)
 
@@ -67,11 +57,8 @@ def collect_data(video_path, label, output_csv):
             frame_idx += 1
 
             if detector is not None:
-                # Multi-pose path (guard against API differences)
                 try:
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    # Some versions expose Image under mediapipe.tasks.python.vision.Image,
-                    # others expect a plain numpy array within an Image wrapper.
                     if hasattr(mp_vision, 'Image') and hasattr(mp_vision, 'ImageFormat'):
                         mp_img = mp_vision.Image(
                             image_format=mp_vision.ImageFormat.SRGB,
@@ -80,7 +67,6 @@ def collect_data(video_path, label, output_csv):
                         result = detector.detect_for_video(
                             mp_img, frame_idx * 33)
                     else:
-                        # If Image API is missing, force fallback
                         raise AttributeError('mp_vision.Image not available')
 
                     if result and result.pose_landmarks:
@@ -88,20 +74,17 @@ def collect_data(video_path, label, output_csv):
                             feats = extract_pose_features_from_list(lm_list)
                             writer.writerow(feats + [label])
                 except Exception:
-                    # Fallback to single-pose for this and subsequent frames
                     print("Fallback to single-pose")
                     detector = None
                     if 'single_pose' not in locals() or single_pose is None:
                         single_pose = mp.solutions.pose.Pose(
                             min_detection_confidence=0.5)
-                    # Process this frame via single-pose
                     img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     results = single_pose.process(img_rgb)
                     if results.pose_landmarks:
                         feats = extract_pose_features(results.pose_landmarks)
                         writer.writerow(feats + [label])
             else:
-                # Single-pose fallback
                 img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = single_pose.process(img_rgb)
                 if results.pose_landmarks:
@@ -117,8 +100,8 @@ def collect_data(video_path, label, output_csv):
 
 
 if __name__ == "__main__":
-    normal_dir = "./Data/Stream/Normal"
-    shoplifting_dir = "./Data/Stream/Shoplifting"
+    normal_dir = "./Data/Stream/Normal - Test/"
+    shoplifting_dir = "./Data/Stream/Shoplifting - Test/"
     output_csv = "pose_data.csv"
 
     # Process all videos in normal_dir with label=0
