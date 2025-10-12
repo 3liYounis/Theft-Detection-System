@@ -1,20 +1,17 @@
 [
     {
-        "image": "1.jpg",
         "id": 1,
-        "name": "Ali Younis",
+        "name": "Ali",
         "phone": 1111111111
     },
         {
-        "image": "2.jpg",
         "id": 2,
-        "name": "Mahdi Mahajna",
+        "name": "Mahdi",
         "phone": 2222222222
     },
         {
-        "image": "3.jpg",
         "id": 3,
-        "name": "Yazan Abo Mokh",
+        "name": "Yazan",
         "phone": 3333333333
     }
 ]
