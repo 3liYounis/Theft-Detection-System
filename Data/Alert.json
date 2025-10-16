@@ -1,9 +1,9 @@
 {
-    "theft link": "./Data/Stream/Shoplifting - Test/Shoplifting (92).mp4",
-    "item": [],
-    "face ID": {
-        "match": "2.jpg",
-        "score": 0.7482225894927979
+    "Theft Link": "../Data/Stream/Shoplifting - Test/Shoplifting (91).mp4",
+    "Face Info": {
+        "id": 1,
+        "name": "Ali",
+        "phone": 1111111111
     },
-    "theft time": "Sunday, 2025-10-12 10:39:12"
+    "Theft Time": "Friday, 2025-10-17 00:49:28"
 }
