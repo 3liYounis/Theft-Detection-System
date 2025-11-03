@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from Behaveioral.inference_lstm import LSTMTheftDetectorInference
+from collections import deque
 
 
 class YOLOPoseTheftDetector:
@@ -122,7 +123,7 @@ class YOLOPoseTheftDetector:
         return best_match
 
     def detect_from_video(self, video_path, visualize=True, save_path=None,
-                          skip_frames=2, batch_size=5):
+                          skip_frames=2):
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             return {'error': 'Cannot open video'}
@@ -243,9 +244,9 @@ class YOLOPoseTheftDetector:
             theft_ratio = sum(prediction_history) / len(prediction_history)
             avg_confidence = np.mean(all_confidences)
             max_confidence = np.max(all_confidences)
-            theft_detected = (theft_ratio >= 0.5 or  # 50% threshold OR
-                              max_confidence >= 0.8 or  # Very high single-frame confidence OR
-                              avg_confidence >= 0.6)    # High average confidence
+            theft_detected = (theft_ratio >= 0.5 or 
+                              max_confidence >= 0.8 or
+                              avg_confidence >= 0.6)
         else:
             theft_ratio = 0
             avg_confidence = 0
@@ -260,27 +261,167 @@ class YOLOPoseTheftDetector:
             'total_frames': total_frames,
             'processed_frames': processed_frames,
             'predictions_made': len(prediction_history),
-            'video_path': video_path,
+            'video_path': save_path,
             'performance': {
                 'skip_frames': skip_frames,
                 'speedup_factor': skip_frames,
                 'processing_efficiency': f"{processed_frames}/{total_frames} frames"
             }
         }
+        return results
 
-        print("\n" + "=" * 50)
-        print("YOLO POSE DETECTION RESULTS (OPTIMIZED)")
-        print("=" * 50)
-        print(f"Theft Detected: {'YES' if theft_detected else 'NO'}")
-        print(f"Confidence: {theft_ratio:.2%} positive frames")
-        print(f"Total Frames: {total_frames}")
-        print(
-            f"Processed Frames: {processed_frames} (every {skip_frames} frames)")
-        print(f"Speed Improvement: {skip_frames}x faster")
-        print(f"Predictions Made: {len(prediction_history)}")
-        print(f"Average Confidence: {avg_confidence:.2%}")
-        print("=" * 50)
+    def detect_realtime(self, skip_frames=2, visualize=True,
+                        save_seconds=5, save_path="realtime_theft.mp4"):
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("❌ Could not open webcam")
+            return {
+                "theft": False,
+                "error": "Camera not available"
+            }
 
+        fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
+        buffer_size = fps * save_seconds
+        frame_buffer = deque(maxlen=buffer_size)
+
+        person_tracking = {}
+        next_pid = 1
+        total_frames = 0
+        processed_frames = 0
+        prediction_history = []
+        confidence_history = []
+
+        last_detections = []
+        theft_detected = False
+
+        writer = None
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            total_frames += 1
+            frame_buffer.append(frame.copy())
+
+            if total_frames % skip_frames != 0:
+                if visualize:
+                    self.draw_multi_person_detection(
+                        frame, last_detections, person_tracking, prediction_history
+                    )
+                    cv2.imshow("Real-Time Theft Detection", frame)
+
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+                continue
+
+            processed_frames += 1
+
+            person_boxes = self.detect_persons_yolo(frame)
+            last_detections = person_boxes
+            current_ids = []
+
+            for pb in person_boxes:
+                pid = self.match_person_to_tracking(pb, person_tracking)
+
+                if pid is None:
+                    pid = next_pid
+                    next_pid += 1
+                    person_tracking[pid] = {
+                        "predictions": [],
+                        "confidences": [],
+                        "bbox_history": [],
+                        "last_seen": total_frames
+                    }
+
+                current_ids.append(pid)
+                person_tracking[pid]["bbox_history"].append(pb["bbox"])
+                person_tracking[pid]["last_seen"] = total_frames
+
+                pose_landmarks = self.extract_pose_from_bbox(frame, pb["bbox"])
+                if pose_landmarks:
+                    pred_info = self.lstm_detector.process_frame(
+                        pose_landmarks)
+
+                    if pred_info and pred_info.get("ready"):
+                        pred = pred_info["prediction"]
+                        conf = pred_info["confidence"]
+
+                        person_tracking[pid]["predictions"].append(pred)
+                        person_tracking[pid]["confidences"].append(conf)
+                        prediction_history.append(pred)
+                        confidence_history.append(conf)
+
+                        if pred == 1 and conf >= 0.8:
+                            theft_detected = True
+                            break
+
+            to_remove = []
+            for pid in person_tracking:
+                if pid not in current_ids and total_frames - person_tracking[pid]["last_seen"] > 30:
+                    to_remove.append(pid)
+
+            for pid in to_remove:
+                del person_tracking[pid]
+
+            if theft_detected:
+                break
+
+            if visualize:
+                self.draw_multi_person_detection(
+                    frame, last_detections, person_tracking, prediction_history
+                )
+                cv2.imshow("Real-Time Theft Detection", frame)
+
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
+        cap.release()
+        if visualize:
+            cv2.destroyAllWindows()
+
+        if prediction_history:
+            theft_ratio = sum(prediction_history) / len(prediction_history)
+            avg_confidence = float(np.mean(confidence_history))
+            max_confidence = float(np.max(confidence_history))
+        else:
+            theft_ratio = 0.0
+            avg_confidence = 0.0
+            max_confidence = 0.0
+
+        theft_final = (
+            theft_detected or
+            theft_ratio >= 0.5 or
+            max_confidence >= 0.8 or
+            avg_confidence >= 0.6
+        )
+
+        if theft_detected:
+            height, width = frame_buffer[0].shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            writer = cv2.VideoWriter(
+                save_path, fourcc, fps, (width, height))
+            for f in frame_buffer:
+                writer.write(f)
+            writer.release()
+        else:
+            save_path = None
+
+        results = {
+            'theft': theft_detected,
+            'theft_ratio': theft_ratio,
+            'avg_confidence': avg_confidence,
+            'max_confidence': max_confidence,
+            'total_frames': total_frames,
+            'processed_frames': processed_frames,
+            'predictions_made': len(prediction_history),
+            'video_path': save_path,
+            'performance': {
+                'skip_frames': skip_frames,
+                'speedup_factor': skip_frames,
+                'processing_efficiency': f"{processed_frames}/{total_frames} frames"
+            }
+        }
         return results
 
     def draw_multi_person_detection(self, frame, person_boxes, person_tracking, prediction_history):
@@ -349,10 +490,26 @@ class YOLOPoseTheftDetector:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
 
 
+def detect_theft_yolo_pose_realtime(model_path='Behaveioral/theft_detector_lstm.keras',
+                                    scaler_path='Behaveioral/scaler_lstm.pkl',
+                                    sequence_length=30, visualize=True, save_path=None,
+                                    skip_frames=2):
+    detector = YOLOPoseTheftDetector(
+        model_path=model_path,
+        scaler_path=scaler_path,
+        sequence_length=sequence_length
+    )
+    return detector.detect_realtime(
+        visualize=visualize,
+        save_path=save_path,
+        skip_frames=skip_frames,
+    )
+
+
 def detect_theft_yolo_pose(video_path, model_path='Behaveioral/theft_detector_lstm.keras',
                            scaler_path='Behaveioral/scaler_lstm.pkl',
                            sequence_length=30, visualize=True, save_path=None,
-                           skip_frames=2, batch_size=5):
+                           skip_frames=2):
     detector = YOLOPoseTheftDetector(
         model_path=model_path,
         scaler_path=scaler_path,
@@ -364,5 +521,4 @@ def detect_theft_yolo_pose(video_path, model_path='Behaveioral/theft_detector_ls
         visualize=visualize,
         save_path=save_path,
         skip_frames=skip_frames,
-        batch_size=batch_size
     )
