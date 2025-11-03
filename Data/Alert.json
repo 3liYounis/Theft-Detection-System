@@ -1,9 +1,9 @@
 {
-    "Theft Link": "../Data/Stream/Normal - Test/Normal (91).mp4",
-    "Face Info": {
-        "id": 1,
-        "name": "Ali",
-        "phone": 1111111111
-    },
-    "Theft Time": "Monday, 2025-10-20 00:47:45"
+    "theif_id": null,
+    "theif_name": null,
+    "theif_phone": null,
+    "theif_age": null,
+    "theif_image": null,
+    "Recording": "../Data/Stream/Shoplifting/Shoplifting (85).mp4",
+    "Date": "Friday, 2025-10-24 21:26:06"
 }

@@ -13,14 +13,10 @@ def run_pipeline(video_path=None):
     Args:
         video_path: Path to video file. If None, uses default test video.
     """
-    # Ensure we have a fresh recording
-    # input_stream()  # optional: uncomment to record new video
-    # stream = get_stream()
-
     # Default test videos
     if video_path is None:
-        # theft_video_path = "../Data/Stream/Shoplifting - Test/Shoplifting (91).mp4"
-        theft_video_path = "../Data/Stream/Normal - Test/Normal (91).mp4"
+        theft_video_path = "../Data/Stream/Shoplifting - Test/Shoplifting (92).mp4"
+        # theft_video_path = "../Data/Stream/Normal - Test/Normal (91).mp4"
         # theft_video_path = "../Data/Stream/Random/ali_hair.mp4"
         # theft_video_path = "../Data/Stream/Random/yazan.mp4"
         # theft_video_path = "../Data/Stream/Random/hamza.mp4"
@@ -100,11 +96,11 @@ def run_yolo_pose_pipeline(video_path=None):
     # Default test videos
     if video_path is None:
         # theft_video_path = "../Data/Stream/Shoplifting - Test/Shoplifting (91).mp4"
-        # theft_video_path = "../Data/Stream/Shoplifting/Shoplifting (85).mp4"
+        theft_video_path = "../Data/Stream/Shoplifting/Shoplifting (85).mp4"
         # theft_video_path = "../Data/Stream/Normal - Test/Normal (91).mp4"
         # theft_video_path = "../Data/Stream/Random/ali_hair.mp4"
         # theft_video_path = "../Data/Stream/Random/yazan.mp4"
-        theft_video_path = "../Data/Stream/Random/hamza.mp4"
+        # theft_video_path = "../Data/Stream/Random/hamza.mp4"
     else:
         theft_video_path = video_path
 
@@ -168,6 +164,8 @@ def run_yolo_pose_pipeline(video_path=None):
 
 if __name__ == "__main__":
     import sys
+    # input_stream()  # optional: uncomment to record new video
+    # stream = get_stream()
     if len(sys.argv) > 1 and sys.argv[1] == "--yolo-pose":
         run_yolo_pose_pipeline()
     else:
