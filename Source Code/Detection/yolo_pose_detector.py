@@ -244,7 +244,7 @@ class YOLOPoseTheftDetector:
             theft_ratio = sum(prediction_history) / len(prediction_history)
             avg_confidence = np.mean(all_confidences)
             max_confidence = np.max(all_confidences)
-            theft_detected = (theft_ratio >= 0.5 or 
+            theft_detected = (theft_ratio >= 0.5 or
                               max_confidence >= 0.8 or
                               avg_confidence >= 0.6)
         else:
