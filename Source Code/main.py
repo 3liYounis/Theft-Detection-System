@@ -81,10 +81,10 @@ def run_yolo_pose_pipeline(video_path=None):
 
 
 if __name__ == "__main__":
-    # theft_video_path = "../Data/Stream/Shoplifting - Test/Shoplifting (91).mp4"
+    theft_video_path = "../Data/Stream/Shoplifting - Test/Shoplifting (93).mp4"
     # theft_video_path = "../Data/Stream/Shoplifting/Shoplifting (85).mp4"
     # theft_video_path = "../Data/Stream/Normal - Test/Normal (91).mp4"
     # theft_video_path = "../Data/Stream/Random/ali_hair.mp4"
     # theft_video_path = "../Data/Stream/Random/yazan.mp4"
     # theft_video_path = "../Data/Stream/Random/hamza.mp4"
-    run_yolo_pose_pipeline()
+    run_yolo_pose_pipeline(theft_video_path)
