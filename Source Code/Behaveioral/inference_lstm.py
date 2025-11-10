@@ -1,19 +1,12 @@
-from .feature_extraction import EnhancedFeatureExtractor
-import cv2
-import mediapipe as mp
-import numpy as np
-import joblib
-from collections import deque
-import sys
 import os
-sys.path.append(os.path.dirname(__file__))
-
-try:
-    from tensorflow import keras
-    TF_AVAILABLE = True
-except ImportError:
-    print("TensorFlow not available. Please install: pip install tensorflow")
-    TF_AVAILABLE = False
+import sys
+import cv2
+import joblib
+import numpy as np
+import mediapipe as mp
+from tensorflow import keras
+from collections import deque
+from feature_extraction import EnhancedFeatureExtractor
 
 
 class LSTMTheftDetectorInference:
@@ -22,8 +15,8 @@ class LSTMTheftDetectorInference:
     Handles sequence buffering and sliding window predictions.
     """
 
-    def __init__(self, model_path='theft_detector_lstm.keras',
-                 scaler_path='scaler_lstm.pkl',
+    def __init__(self, model_path='./model/theft_detector_lstm.keras',
+                 scaler_path='./scaler/scaler_lstm.pkl',
                  sequence_length=30):
         """
         Initialize inference engine.
@@ -33,9 +26,6 @@ class LSTMTheftDetectorInference:
             scaler_path: path to fitted scaler
             sequence_length: number of frames in sequence (must match training)
         """
-        if not TF_AVAILABLE:
-            raise ImportError("TensorFlow required for LSTM inference")
-
         self.sequence_length = sequence_length
         self.model = keras.models.load_model(model_path)
         self.scaler = joblib.load(scaler_path)
@@ -263,9 +253,6 @@ class LSTMTheftDetectorInference:
 
 
 def detect_theft_lstm(video_path,
-                      model_path='theft_detector_lstm.keras',
-                      scaler_path='scaler_lstm.pkl',
-                      sequence_length=30,
                       threshold=0.5,
                       window_size=90,
                       positive_ratio=0.6,
@@ -290,12 +277,7 @@ def detect_theft_lstm(video_path,
         dict with detection results
     """
     try:
-        detector = LSTMTheftDetectorInference(
-            model_path=model_path,
-            scaler_path=scaler_path,
-            sequence_length=sequence_length
-        )
-
+        detector = LSTMTheftDetectorInference()
         results = detector.detect_from_video(
             video_path=video_path,
             threshold=threshold,
@@ -304,7 +286,6 @@ def detect_theft_lstm(video_path,
             visualize=visualize,
             save_path=save_path
         )
-
         return results
 
     except Exception as e:
@@ -319,25 +300,17 @@ def detect_theft_lstm(video_path,
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1:
-        video_path = sys.argv[1]
-    else:
-        video_path = "./Data/Stream/Shoplifting - Test/Shoplifting (92).mp4"
-        # video_path = "./Data/Stream/Normal - Test/Normal (93).mp4"
+    video_path = "../../Data/Stream/Shoplifting - Test/Shoplifting (92).mp4"
+    # video_path = "../../Data/Stream/Normal - Test/Normal (92).mp4"
 
     print(f"Testing LSTM detector on: {video_path}")
 
     results = detect_theft_lstm(
         video_path=video_path,
-        model_path='theft_detector_lstm.keras',
-        scaler_path='scaler_lstm.pkl',
-        sequence_length=30,
         window_size=90,
         positive_ratio=0.6,
         visualize=True,
-        save_path='output_lstm.mp4'
+        # save_path='output_lstm.mp4'
     )
 
     print("\nFinal Results:")

@@ -28,6 +28,7 @@ class EnhancedFeatureExtractor:
         landmarks_array = np.array([[lm.x, lm.y, lm.z] for lm in lms])
 
         # 1. NORMALIZATION - Get body center and scale
+
         # Hip center as body reference point
         hip_left = landmarks_array[23]   # Left hip
         hip_right = landmarks_array[24]  # Right hip
@@ -80,6 +81,7 @@ class EnhancedFeatureExtractor:
         features.append(angle_torso)
 
         # 4. RELATIVE DISTANCES (suspicious behavior indicators)
+
         # Hand to hip distance (normalized)
         dist_r_hand_hip = np.linalg.norm(
             landmarks_array[16] - hip_right) / torso_length

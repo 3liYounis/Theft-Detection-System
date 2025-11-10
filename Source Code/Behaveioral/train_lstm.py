@@ -1,26 +1,21 @@
-import numpy as np
-import os
-import glob
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
-import matplotlib.pyplot as plt
-import seaborn as sns
-import joblib
+from tensorflow import keras
 
-try:
-    import tensorflow as tf
-    from tensorflow import keras
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional, BatchNormalization
-    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-    from tensorflow.keras.optimizers import Adam
-    from tensorflow.keras.regularizers import l2
-    print(f"TensorFlow version: {tf.__version__}")
-    TF_AVAILABLE = True
-except ImportError:
-    print("TensorFlow not available. Please install: pip install tensorflow")
-    TF_AVAILABLE = False
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional, BatchNormalization
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l2
+
+import os
+import glob
+import joblib
+import numpy as np
+import seaborn as sns
+import tensorflow as tf
+import matplotlib.pyplot as plt
 
 
 class LSTMTheftDetector:
@@ -28,12 +23,14 @@ class LSTMTheftDetector:
     LSTM-based theft detection model with preprocessing and evaluation utilities.
     """
 
-    def __init__(self, sequence_length=30, feature_dim=None):
+    def __init__(self, sequence_length=30, feature_dim=None, save_dir="./training_results"):
         self.sequence_length = sequence_length
         self.feature_dim = feature_dim
         self.model = None
         self.scaler = None
         self.history = None
+        self.save_dir = save_dir
+        os.makedirs(save_dir, exist_ok=True)
 
     def load_sequences(self, sequence_dir):
         """
@@ -165,7 +162,7 @@ class LSTMTheftDetector:
         )
 
         checkpoint = ModelCheckpoint(
-            'best_theft_detector_lstm.keras',
+            './model/best_theft_detector_lstm.keras',
             monitor='val_auc',
             mode='max',
             save_best_only=True,
@@ -207,9 +204,7 @@ class LSTMTheftDetector:
         return class_weight_dict
 
     def evaluate(self, X_test, y_test):
-        """
-        Comprehensive model evaluation.
-        """
+
         print("\n" + "=" * 50)
         print("EVALUATION RESULTS")
         print("=" * 50)
@@ -250,7 +245,6 @@ class LSTMTheftDetector:
         }
 
     def _plot_training_history(self):
-        """Plot training history"""
         if self.history is None:
             return
 
@@ -295,20 +289,22 @@ class LSTMTheftDetector:
         axes[1, 1].grid(True)
 
         plt.tight_layout()
-        plt.savefig('training_history.png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.save_dir, 'training_history.png'),
+                    dpi=300, bbox_inches='tight')
         print("\nTraining history plot saved to training_history.png")
         plt.close()
 
     def _plot_confusion_matrix(self, cm):
         """Plot confusion matrix"""
         plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Reds',
                     xticklabels=['Normal', 'Shoplifting'],
                     yticklabels=['Normal', 'Shoplifting'])
         plt.title('Confusion Matrix')
         plt.ylabel('True Label')
         plt.xlabel('Predicted Label')
-        plt.savefig('confusion_matrix.png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.save_dir, 'confusion_matrix.png'),
+                    dpi=300, bbox_inches='tight')
         print("Confusion matrix plot saved to confusion_matrix.png")
         plt.close()
 
@@ -325,19 +321,18 @@ class LSTMTheftDetector:
         plt.title('ROC Curve')
         plt.legend()
         plt.grid(True)
-        plt.savefig('roc_curve.png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.save_dir, 'roc_curve.png'),
+                    dpi=300, bbox_inches='tight')
         print("ROC curve plot saved to roc_curve.png")
         plt.close()
 
-    def save(self, model_path='theft_detector_lstm.keras', scaler_path='scaler_lstm.pkl'):
-        """Save model and scaler"""
+    def save(self, model_path='./model/theft_detector_lstm.keras', scaler_path='./scaler/scaler_lstm.pkl'):
         self.model.save(model_path)
         joblib.dump(self.scaler, scaler_path)
         print(f"\nModel saved to {model_path}")
         print(f"Scaler saved to {scaler_path}")
 
-    def load(self, model_path='theft_detector_lstm.keras', scaler_path='scaler_lstm.pkl'):
-        """Load model and scaler"""
+    def load(self, model_path='./model/theft_detector_lstm.keras', scaler_path='./scaler/scaler_lstm.pkl'):
         self.model = keras.models.load_model(model_path)
         self.scaler = joblib.load(scaler_path)
         print(f"Model loaded from {model_path}")
@@ -345,12 +340,6 @@ class LSTMTheftDetector:
 
 
 def main():
-    """Main training pipeline"""
-
-    if not TF_AVAILABLE:
-        print("ERROR: TensorFlow is required. Install with: pip install tensorflow")
-        return
-
     SEQUENCE_DIR = "../../Data/Sequences"
     SEQUENCE_LENGTH = 30
     EPOCHS = 50

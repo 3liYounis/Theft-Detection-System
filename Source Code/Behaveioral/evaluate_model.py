@@ -1,19 +1,14 @@
-import numpy as np
+import os
+import json
+import glob
 import joblib
-import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from tensorflow import keras
+import matplotlib.pyplot as plt
 from sklearn.metrics import (classification_report, confusion_matrix,
                              roc_auc_score, roc_curve, precision_recall_curve,
                              average_precision_score)
-import os
-import glob
-
-try:
-    from tensorflow import keras
-    TF_AVAILABLE = True
-except ImportError:
-    print("TensorFlow not available")
-    TF_AVAILABLE = False
 
 
 class ModelEvaluator:
@@ -31,45 +26,28 @@ class ModelEvaluator:
         """
         self.model_type = model_type
         self.scaler = None
-
-        if model_type == 'lstm':
-            if not TF_AVAILABLE:
-                raise ImportError("TensorFlow required for LSTM evaluation")
-            self.model = keras.models.load_model(model_path)
-            if scaler_path:
-                self.scaler = joblib.load(scaler_path)
-        else:
-            self.model = joblib.load(model_path)
+        self.model = keras.models.load_model(model_path)
+        if scaler_path:
+            self.scaler = joblib.load(scaler_path)
 
         print(f"Loaded {model_type} model from {model_path}")
 
-    def load_test_data(self, data_path, is_sequence=False):
+    def load_test_data(self, data_path):
         """
         Load test data.
-
         Args:
-            data_path: path to test data (csv for RF, directory for LSTM)
-            is_sequence: whether data is sequences (for LSTM)
+            data_path: path to test data (directory for LSTM)
         """
-        if is_sequence:
-            X_list, y_list = [], []
-            npz_files = glob.glob(os.path.join(data_path, "*.npz"))
+        X_list, y_list = [], []
+        npz_files = glob.glob(os.path.join(data_path, "*.npz"))
+        print(data_path)
+        for npz_file in npz_files:
+            data = np.load(npz_file)
+            X_list.append(data['sequences'])
+            y_list.append(data['labels'])
 
-            for npz_file in npz_files:
-                data = np.load(npz_file)
-                X_list.append(data['sequences'])
-                y_list.append(data['labels'])
-
-            X = np.vstack(X_list)
-            y = np.concatenate(y_list)
-        else:
-            import pandas as pd
-            data = pd.read_csv(data_path, header=None)
-            X = data.iloc[:, :-1].values
-            y = data.iloc[:, -1].values
-        print(f"Loaded test data: {X.shape}")
-        print(
-            f"Class distribution: Normal={np.sum(y==0)}, Shoplifting={np.sum(y==1)}")
+        X = np.vstack(X_list)
+        y = np.concatenate(y_list)
 
         return X, y
 
@@ -181,8 +159,6 @@ class ModelEvaluator:
             'fnr': float(fnr_value),
             'confusion_matrix': cm.tolist()
         }
-
-        import json
         with open(os.path.join(save_dir, 'evaluation_results.json'), 'w') as f:
             json.dump(results, f, indent=2)
 
@@ -378,35 +354,23 @@ class ModelEvaluator:
 
 
 if __name__ == "__main__":
-    import argparse
+    DATA_PATH = "../../Data/Sequences"
+    MODEL_PATH = "./best_theft_detector_lstm.keras"
 
-    parser = argparse.ArgumentParser(
-        description='Evaluate theft detection model')
-    parser.add_argument('--model_path', type=str,
-                        required=True, help='Path to model file')
-    parser.add_argument('--data_path', type=str,
-                        required=True, help='Path to test data')
-    parser.add_argument('--scaler_path', type=str,
-                        default=None, help='Path to scaler (for LSTM)')
-    parser.add_argument('--model_type', type=str,
-                        default='lstm', choices=['lstm', 'random_forest'])
-    parser.add_argument('--save_dir', type=str,
-                        default='evaluation_results', help='Output directory')
-
-    args = parser.parse_args()
+    SCALER_PATH = "./scaler_lstm.pkl"
+    MODEL_TYPE = 'lstm'
+    SAVE_DIR = "./evaluation_results"
 
     evaluator = ModelEvaluator(
-        model_path=args.model_path,
-        scaler_path=args.scaler_path,
-        model_type=args.model_type
+        model_path=MODEL_PATH,
+        scaler_path=SCALER_PATH,
+        model_type=MODEL_TYPE
     )
 
-    is_sequence = args.model_type == 'lstm'
-    X_test, y_test = evaluator.load_test_data(
-        args.data_path, is_sequence=is_sequence)
+    X_test, y_test = evaluator.load_test_data(DATA_PATH)
 
     results = evaluator.evaluate_comprehensive(
-        X_test, y_test, save_dir=args.save_dir)
+        X_test, y_test, save_dir=SAVE_DIR)
 
     print("\n" + "=" * 60)
     print("FINAL SUMMARY")
