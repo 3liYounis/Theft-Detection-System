@@ -1,53 +1,31 @@
 import numpy as np
 from collections import deque
-
-
 class EnhancedFeatureExtractor:
-    """
-    Enhanced feature extraction for pose-based behavior recognition.
-    Includes spatial features (angles, distances), temporal features (velocity, acceleration),
-    and body-relative normalization for camera-invariant detection.
-    """
-
     def __init__(self, temporal_window=10):
         self.temporal_window = temporal_window
         self.pose_history = deque(maxlen=temporal_window)
 
     def reset(self):
-        """Reset temporal history"""
         self.pose_history.clear()
 
     def extract_spatial_features(self, pose_landmarks):
-        """
-        Extract spatial features from a single frame.
-        Returns camera-invariant features based on body geometry.
-        """
         features = []
-        lms = pose_landmarks.landmark if hasattr(
-            pose_landmarks, 'landmark') else pose_landmarks
+        lms = pose_landmarks.landmark
         landmarks_array = np.array([[lm.x, lm.y, lm.z] for lm in lms])
 
-        # 1. NORMALIZATION - Get body center and scale
-
-        # Hip center as body reference point
-        hip_left = landmarks_array[23]   # Left hip
-        hip_right = landmarks_array[24]  # Right hip
+        hip_left = landmarks_array[23]
+        hip_right = landmarks_array[24]
         hip_center = (hip_left + hip_right) / 2
 
-        # Body scale (torso length for normalization)
         shoulder_center = (landmarks_array[11] + landmarks_array[12]) / 2
         torso_length = np.linalg.norm(shoulder_center - hip_center)
-        torso_length = max(torso_length, 0.001)  # Avoid division by zero
+        torso_length = max(torso_length, 0.001)
 
-        # 2. BODY-RELATIVE COORDINATES (normalized by torso length)
-        # Key points: hands, elbows, shoulders, head, knees
-        # Nose, shoulders, elbows, wrists, hips, knees, ankles
         key_indices = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]
         for idx in key_indices:
             relative_pos = (landmarks_array[idx] - hip_center) / torso_length
-            features.extend(relative_pos)  # x, y, z
+            features.extend(relative_pos)
 
-        # 3. JOINT ANGLES (critical for pose understanding)
         # Right elbow angle
         angle_r_elbow = self._calculate_angle(
             # shoulder-elbow-wrist
@@ -80,8 +58,6 @@ class EnhancedFeatureExtractor:
         )
         features.append(angle_torso)
 
-        # 4. RELATIVE DISTANCES (suspicious behavior indicators)
-
         # Hand to hip distance (normalized)
         dist_r_hand_hip = np.linalg.norm(
             landmarks_array[16] - hip_right) / torso_length
@@ -101,7 +77,6 @@ class EnhancedFeatureExtractor:
             landmarks_array[15][:2] - hip_center[:2]) / torso_length
         features.extend([dist_r_hand_torso, dist_l_hand_torso])
 
-        # 5. BODY CONFIGURATION
         # Shoulder width (normalized)
         shoulder_width = np.linalg.norm(
             landmarks_array[11] - landmarks_array[12]) / torso_length
@@ -118,7 +93,6 @@ class EnhancedFeatureExtractor:
         ) / torso_length
         features.append(arm_symmetry)
 
-        # 6. HEAD ORIENTATION
         # Head tilt (nose relative to shoulders)
         head_tilt_x = (landmarks_array[0][0] -
                        shoulder_center[0]) / torso_length
@@ -126,16 +100,11 @@ class EnhancedFeatureExtractor:
                        shoulder_center[1]) / torso_length
         features.extend([head_tilt_x, head_tilt_y])
 
-        # 7. CONFIDENCE/METADATA
         features.append(torso_length)  # Body scale (for debugging)
 
         return np.array(features)
 
     def extract_temporal_features(self):
-        """
-        Extract temporal features from pose history.
-        SIMPLIFIED VERSION - Always returns exactly 30 features.
-        """
         features = np.zeros(30)
 
         if len(self.pose_history) < 2:
@@ -182,10 +151,6 @@ class EnhancedFeatureExtractor:
         return features
 
     def extract_features(self, pose_landmarks):
-        """
-        Extract complete feature set (spatial + temporal).
-        Always returns exactly the same number of features for consistency.
-        """
         spatial_features = self.extract_spatial_features(pose_landmarks)
 
         self.pose_history.append(spatial_features)
@@ -198,10 +163,6 @@ class EnhancedFeatureExtractor:
         return combined_features
 
     def _calculate_angle(self, a, b, c):
-        """
-        Calculate angle at point b formed by points a-b-c.
-        Returns angle in degrees.
-        """
         # Vectors
         ba = a - b
         bc = c - b
@@ -217,9 +178,6 @@ class EnhancedFeatureExtractor:
         return angle
 
     def get_feature_names(self):
-        """
-        Return feature names for interpretability.
-        """
         names = []
 
         # Body-relative coordinates (13 keypoints * 3 coords)
@@ -256,18 +214,6 @@ class EnhancedFeatureExtractor:
 
 
 def augment_pose_data(landmarks_array, flip=False, noise_level=0.01, scale_factor=1.0):
-    """
-    Augment pose data for better generalization.
-
-    Args:
-        landmarks_array: numpy array of shape (33, 3) with x,y,z coordinates
-        flip: whether to flip horizontally (mirror)
-        noise_level: standard deviation of Gaussian noise to add
-        scale_factor: scale the pose (simulate different distances)
-
-    Returns:
-        Augmented landmarks array
-    """
     augmented = landmarks_array.copy()
 
     # Horizontal flip

@@ -12,18 +12,7 @@ from sklearn.metrics import (classification_report, confusion_matrix,
 
 
 class ModelEvaluator:
-    """
-    Comprehensive evaluation suite for theft detection models.
-    Supports both LSTM and traditional ML models.
-    """
-
     def __init__(self, model_path, scaler_path=None, model_type='lstm'):
-        """
-        Args:
-            model_path: path to model file
-            scaler_path: path to scaler (for LSTM)
-            model_type: 'lstm' or 'random_forest'
-        """
         self.model_type = model_type
         self.scaler = None
         self.model = keras.models.load_model(model_path)
@@ -33,11 +22,6 @@ class ModelEvaluator:
         print(f"Loaded {model_type} model from {model_path}")
 
     def load_test_data(self, data_path):
-        """
-        Load test data.
-        Args:
-            data_path: path to test data (directory for LSTM)
-        """
         X_list, y_list = [], []
         npz_files = glob.glob(os.path.join(data_path, "*.npz"))
         print(data_path)
@@ -52,7 +36,6 @@ class ModelEvaluator:
         return X, y
 
     def preprocess_data(self, X):
-        """Preprocess data using scaler"""
         if self.scaler is None:
             return X
 
@@ -65,7 +48,6 @@ class ModelEvaluator:
             return self.scaler.transform(X)
 
     def predict(self, X):
-        """Make predictions"""
         if self.model_type == 'lstm':
             y_pred_proba = self.model.predict(X, verbose=0)
             if len(y_pred_proba.shape) > 1:
@@ -76,9 +58,6 @@ class ModelEvaluator:
         return y_pred_proba
 
     def evaluate_comprehensive(self, X, y, save_dir='evaluation_results'):
-        """
-        Run comprehensive evaluation.
-        """
         os.makedirs(save_dir, exist_ok=True)
 
         print("\n" + "=" * 60)
@@ -90,21 +69,17 @@ class ModelEvaluator:
         y_pred_proba = self.predict(X_processed)
         y_pred = (y_pred_proba > 0.5).astype(int)
 
-        # 1. Classification Report
-        print("\n1. CLASSIFICATION REPORT")
-        print("-" * 60)
+        print("CLASSIFICATION REPORT")
         report = classification_report(y, y_pred,
                                        target_names=['Normal', 'Shoplifting'],
                                        digits=4, output_dict=True)
         print(classification_report(y, y_pred, target_names=[
               'Normal', 'Shoplifting'], digits=4))
 
-        # 2. Confusion Matrix
-        print("\n2. CONFUSION MATRIX")
-        print("-" * 60)
+        print("2. CONFUSION MATRIX")
         cm = confusion_matrix(y, y_pred)
         print(cm)
-        print(f"\nTrue Negatives (Correct Normal): {cm[0,0]}")
+        print(f"True Negatives (Correct Normal): {cm[0,0]}")
         print(f"False Positives (Normal → Shoplifting): {cm[0,1]}")
         print(f"False Negatives (Shoplifting → Normal): {cm[1,0]}")
         print(f"True Positives (Correct Shoplifting): {cm[1,1]}")
@@ -118,27 +93,21 @@ class ModelEvaluator:
         print(f"False Negative Rate: {fnr_value:.4f} ({fnr_value*100:.2f}%)")
 
         # 3. ROC-AUC
-        print("\n3. ROC-AUC ANALYSIS")
+        print("ROC-AUC ANALYSIS")
         print("-" * 60)
         auc_score = roc_auc_score(y, y_pred_proba)
         print(f"ROC-AUC Score: {auc_score:.4f}")
 
         # 4. Precision-Recall
-        print("\n4. PRECISION-RECALL ANALYSIS")
+        print("PRECISION-RECALL ANALYSIS")
         print("-" * 60)
         ap_score = average_precision_score(y, y_pred_proba)
         print(f"Average Precision Score: {ap_score:.4f}")
 
         # 5. Threshold Analysis
-        print("\n5. THRESHOLD ANALYSIS")
+        print("THRESHOLD ANALYSIS")
         print("-" * 60)
         self._threshold_analysis(y, y_pred_proba)
-
-        # 6. Feature Importance (if available)
-        if self.model_type == 'random_forest':
-            print("\n6. FEATURE IMPORTANCE")
-            print("-" * 60)
-            self._feature_importance_analysis(save_dir)
 
         # Generate plots
         self._plot_confusion_matrix(cm, save_dir)
@@ -147,7 +116,6 @@ class ModelEvaluator:
         self._plot_confidence_distribution(y, y_pred_proba, save_dir)
         self._plot_threshold_metrics(y, y_pred_proba, save_dir)
 
-        # Summary statistics
         results = {
             'accuracy': float(report['accuracy']),
             'precision': float(report['Shoplifting']['precision']),
@@ -161,18 +129,13 @@ class ModelEvaluator:
         }
         with open(os.path.join(save_dir, 'evaluation_results.json'), 'w') as f:
             json.dump(results, f, indent=2)
-
-        print(f"\n\nEvaluation complete! Results saved to {save_dir}/")
-
         return results
 
     def _threshold_analysis(self, y_true, y_pred_proba):
-        """Analyze performance at different thresholds"""
         thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
 
         print(
             f"{'Threshold':<12} {'Precision':<12} {'Recall':<12} {'F1':<12} {'FPR':<12}")
-        print("-" * 60)
 
         for thresh in thresholds:
             y_pred = (y_pred_proba > thresh).astype(int)
@@ -192,15 +155,12 @@ class ModelEvaluator:
                     f"{thresh:<12.1f} {precision:<12.4f} {recall:<12.4f} {f1:<12.4f} {fpr:<12.4f}")
 
     def _feature_importance_analysis(self, save_dir):
-        """Analyze feature importance for tree-based models"""
         if not hasattr(self.model, 'feature_importances_'):
-            print("Feature importance not available for this model")
             return
 
         importances = self.model.feature_importances_
         indices = np.argsort(importances)[::-1]
 
-        print("\nTop 20 Most Important Features:")
         for i in range(min(20, len(importances))):
             idx = indices[i]
             print(f"  {i+1}. Feature {idx}: {importances[idx]:.4f}")
@@ -216,7 +176,6 @@ class ModelEvaluator:
         plt.close()
 
     def _plot_confusion_matrix(self, cm, save_dir):
-        """Plot confusion matrix"""
         plt.figure(figsize=(8, 6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=True,
                     xticklabels=['Normal', 'Shoplifting'],
@@ -231,7 +190,6 @@ class ModelEvaluator:
         print(f"Saved: {save_dir}/confusion_matrix.png")
 
     def _plot_roc_curve(self, y_true, y_pred_proba, save_dir):
-        """Plot ROC curve"""
         fpr, tpr, _ = roc_curve(y_true, y_pred_proba)
         auc = roc_auc_score(y_true, y_pred_proba)
 
@@ -253,7 +211,6 @@ class ModelEvaluator:
         print(f"Saved: {save_dir}/roc_curve.png")
 
     def _plot_precision_recall_curve(self, y_true, y_pred_proba, save_dir):
-        """Plot Precision-Recall curve"""
         precision, recall, _ = precision_recall_curve(y_true, y_pred_proba)
         ap = average_precision_score(y_true, y_pred_proba)
 
@@ -274,7 +231,6 @@ class ModelEvaluator:
         print(f"Saved: {save_dir}/precision_recall_curve.png")
 
     def _plot_confidence_distribution(self, y_true, y_pred_proba, save_dir):
-        """Plot confidence distribution for both classes"""
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
         normal_confidences = y_pred_proba[y_true == 0]
@@ -308,7 +264,6 @@ class ModelEvaluator:
         print(f"Saved: {save_dir}/confidence_distribution.png")
 
     def _plot_threshold_metrics(self, y_true, y_pred_proba, save_dir):
-        """Plot metrics vs threshold"""
         thresholds = np.linspace(0, 1, 100)
         precisions, recalls, f1s, fprs = [], [], [], []
 

@@ -1,8 +1,8 @@
-import threading
 from Detection.yolo_pose_detector import detect_theft_yolo_pose_realtime
 from Recognition.recognize_face import get_face_info, recognize_face
 from Alert.alert import alert
 from datetime import datetime
+import threading
 import queue
 
 theft_queue = queue.Queue()
@@ -31,7 +31,7 @@ def run_realtime_detection():
             scaler_path='Behaveioral/scaler_lstm.pkl',
             sequence_length=30,
             visualize=True,
-            save_path='output_yolo_pose.mp4',
+            # save_path='output_yolo_pose.mp4',
             skip_frames=2,
         )
         if ml_info.get("theft"):

@@ -10,54 +10,27 @@ from feature_extraction import EnhancedFeatureExtractor
 
 
 class LSTMTheftDetectorInference:
-    """
-    Real-time theft detection using LSTM model.
-    Handles sequence buffering and sliding window predictions.
-    """
-
     def __init__(self, model_path='./model/theft_detector_lstm.keras',
                  scaler_path='./scaler/scaler_lstm.pkl',
                  sequence_length=30):
-        """
-        Initialize inference engine.
 
-        Args:
-            model_path: path to trained LSTM model
-            scaler_path: path to fitted scaler
-            sequence_length: number of frames in sequence (must match training)
-        """
         self.sequence_length = sequence_length
         self.model = keras.models.load_model(model_path)
         self.scaler = joblib.load(scaler_path)
         self.feature_extractor = EnhancedFeatureExtractor(temporal_window=10)
         self.sequence_buffer = deque(maxlen=sequence_length)
 
-        print(f"Loaded LSTM model from {model_path}")
-        print(f"Loaded scaler from {scaler_path}")
-        print(f"Sequence length: {sequence_length}")
-
     def reset(self):
-        """Reset internal buffers"""
         self.sequence_buffer.clear()
         self.feature_extractor.reset()
 
     def process_frame(self, pose_landmarks):
-        """
-        Process a single frame and update sequence buffer.
-
-        Args:
-            pose_landmarks: MediaPipe pose landmarks
-
-        Returns:
-            dict with prediction info, or None if not enough frames yet
-        """
         if pose_landmarks is None:
             # No pose detected - add zero features
             if len(self.sequence_buffer) > 0:
                 zero_features = np.zeros_like(self.sequence_buffer[-1])
                 self.sequence_buffer.append(zero_features)
             return None
-
         try:
             features = self.feature_extractor.extract_features(pose_landmarks)
             self.sequence_buffer.append(features)
@@ -98,20 +71,6 @@ class LSTMTheftDetectorInference:
                           decision_ratio=0.6,
                           visualize=True,
                           save_path=None):
-        """
-        Run theft detection on a video file.
-
-        Args:
-            video_path: path to video file or 0 for webcam
-            threshold: confidence threshold for classification
-            decision_window: number of recent frames to aggregate for final decision
-            decision_ratio: fraction of positive predictions needed to declare theft
-            visualize: whether to show visualization
-            save_path: path to save output video (optional)
-
-        Returns:
-            dict with detection results
-        """
         video = cv2.VideoCapture(video_path)
         if not video.isOpened():
             return {
@@ -128,9 +87,7 @@ class LSTMTheftDetectorInference:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
-
         self.reset()
-
         total_frames = 0
         predictions_ready = 0
         prediction_history = deque(maxlen=decision_window)
@@ -238,17 +195,6 @@ class LSTMTheftDetectorInference:
             'threshold': threshold,
             'decision_ratio': decision_ratio
         }
-
-        print("\n" + "=" * 50)
-        print("DETECTION RESULTS")
-        print("=" * 50)
-        print(f"Theft Detected: {'YES' if theft_decision else 'NO'}")
-        print(f"Confidence: {final_ratio:.2%} positive frames")
-        print(f"Total Frames: {total_frames}")
-        print(f"Predictions Made: {predictions_ready}")
-        print(f"Average Confidence: {avg_confidence:.2%}")
-        print("=" * 50)
-
         return results_dict
 
 
@@ -258,24 +204,6 @@ def detect_theft_lstm(video_path,
                       positive_ratio=0.6,
                       visualize=True,
                       save_path=None):
-    """
-    Convenience function for theft detection using LSTM.
-    Compatible with existing interface.
-
-    Args:
-        video_path: path to video file
-        model_path: path to LSTM model
-        scaler_path: path to scaler
-        sequence_length: sequence length (must match training)
-        threshold: classification threshold
-        window_size: sliding window for aggregation
-        positive_ratio: ratio for final decision
-        visualize: show visualization
-        save_path: save output video
-
-    Returns:
-        dict with detection results
-    """
     try:
         detector = LSTMTheftDetectorInference()
         results = detector.detect_from_video(
@@ -310,7 +238,7 @@ if __name__ == "__main__":
         window_size=90,
         positive_ratio=0.6,
         visualize=True,
-        # save_path='output_lstm.mp4'
+        save_path='output_lstm.mp4'
     )
 
     print("\nFinal Results:")

@@ -29,7 +29,7 @@ def run_yolo_pose_pipeline(video_path=None):
             scaler_path='Behaveioral/scaler_lstm.pkl',
             sequence_length=30,
             visualize=True,
-            save_path='output_yolo_pose.mp4',
+            # save_path='output_yolo_pose.mp4',
             skip_frames=2,
         )
     else:
@@ -38,7 +38,7 @@ def run_yolo_pose_pipeline(video_path=None):
             scaler_path='Behaveioral/scaler_lstm.pkl',
             sequence_length=30,
             visualize=True,
-            save_path='output_yolo_pose.mp4',
+            # save_path='output_yolo_pose.mp4',
             skip_frames=2,
         )
     theft_decision = ml_info.get("theft")

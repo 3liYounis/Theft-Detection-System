@@ -6,35 +6,19 @@ import os
 
 
 def collect_sequences(video_path, label, output_dir, sequence_length=30, stride=10, skip_existing=True):
-    """
-    Collect sequences for LSTM training.
-    Instead of individual frames, collect overlapping sequences.
-
-    Args:
-        video_path: path to video file
-        label: 0 for normal, 1 for shoplifting
-        output_dir: directory to save sequence files
-        sequence_length: number of frames per sequence
-        stride: step size for sliding window
-        skip_existing: if True, skip videos that have already been processed
-    """
     os.makedirs(output_dir, exist_ok=True)
     video_name = os.path.basename(video_path).replace('.mp4', '')
     output_file = os.path.join(output_dir, f"{video_name}_label{label}.npz")
 
     if skip_existing and os.path.exists(output_file):
-        print(f"✓: Skipping {video_name} (already processed)")
         try:
             data = np.load(output_file)
             return -len(data['sequences'])
         except:
-            print(f"  Warning: Could not read existing file, will reprocess")
-
+            print(f"Could not read existing file!")
     video = cv2.VideoCapture(video_path)
     if not video.isOpened():
-        print(f"X: Cannot open video: {video_path}")
         return 0
-
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(
         static_image_mode=False,
@@ -42,9 +26,7 @@ def collect_sequences(video_path, label, output_dir, sequence_length=30, stride=
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5
     )
-
     feature_extractor = EnhancedFeatureExtractor(temporal_window=10)
-
     all_features = []
     frame_count = 0
     while True:
@@ -65,47 +47,28 @@ def collect_sequences(video_path, label, output_dir, sequence_length=30, stride=
 
     video.release()
     pose.close()
-    print(
-        f"Extracted {len(all_features)} feature vectors from {frame_count} frames")
-
-    # Error Handling
     if len(all_features) < sequence_length:
-        print(
-            f"Not enough frames ({len(all_features)}) for sequence length {sequence_length}")
         return 0
-
     try:
         all_features_array = np.array(all_features)
-        print(f"Feature shape: {all_features_array.shape}")
     except ValueError as e:
-        print(f"Error converting features to array: {e}")
-        print(f"Feature lengths: {[len(f) for f in all_features[:5]]}")
         return 0
-
     sequences = []
     for i in range(0, len(all_features_array) - sequence_length + 1, stride):
         sequence = all_features_array[i:i + sequence_length]
         sequences.append(sequence)
 
     sequences_array = np.array(sequences)
-    print(
-        f"Created {len(sequences)} sequences with shape: {sequences_array.shape}")
 
     np.savez_compressed(output_file,
                         sequences=sequences_array,
                         labels=np.array([label] * len(sequences)))
-
-    print(f"✓: Saved {len(sequences)} sequences to {output_file}")
     return len(sequences)
 
 
 if __name__ == "__main__":
     normal_dir = "../../Data/Stream/Normal - Train/"
     shoplifting_dir = "../../Data/Stream/Shoplifting - Train/"
-
-    print("\n" + "=" * 50)
-    print("Collecting sequences for LSTM training...")
-    print("=" * 50)
 
     sequence_output_dir = "../../Data/Sequences"
     sequence_length = 30
@@ -151,13 +114,3 @@ if __name__ == "__main__":
                 else:
                     videos_processed += 1
                     total_sequences += count
-
-    print("\n" + "=" * 50)
-    print("DATA COLLECTION COMPLETE!")
-    print("=" * 50)
-    print(f"Total sequences: {total_sequences}")
-    print(f"Videos newly processed: {videos_processed}")
-    print(f"Videos skipped (already done): {videos_skipped}")
-    print(f"Sequences saved to: {sequence_output_dir}/")
-    print("\nNext step: Run 'python train_lstm.py' to train the model")
-    print("=" * 50)

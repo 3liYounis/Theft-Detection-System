@@ -19,10 +19,6 @@ import matplotlib.pyplot as plt
 
 
 class LSTMTheftDetector:
-    """
-    LSTM-based theft detection model with preprocessing and evaluation utilities.
-    """
-
     def __init__(self, sequence_length=30, feature_dim=None, save_dir="./training_results"):
         self.sequence_length = sequence_length
         self.feature_dim = feature_dim
@@ -33,11 +29,6 @@ class LSTMTheftDetector:
         os.makedirs(save_dir, exist_ok=True)
 
     def load_sequences(self, sequence_dir):
-        """
-        Load sequence data from directory of .npz files.
-        """
-        print("Loading sequence data...")
-
         all_sequences = []
         all_labels = []
 
@@ -59,24 +50,12 @@ class LSTMTheftDetector:
 
         X = np.vstack(all_sequences)
         y = np.concatenate(all_labels)
-
-        print(f"\nTotal sequences: {len(X)}")
-        print(f"Sequence shape: {X.shape}")
-        print(
-            f"Label distribution: Normal={np.sum(y==0)}, Shoplifting={np.sum(y==1)}")
-
         if self.feature_dim is None:
             self.feature_dim = X.shape[2]
 
         return X, y
 
     def preprocess_data(self, X_train, X_test):
-        """
-        Normalize features using StandardScaler.
-        Fit on training data only to prevent data leakage.
-        """
-        print("Preprocessing data...")
-
         n_samples_train, seq_len, n_features = X_train.shape
         n_samples_test = X_test.shape[0]
 
@@ -92,17 +71,9 @@ class LSTMTheftDetector:
         X_test_scaled = X_test_scaled_2d.reshape(
             n_samples_test, seq_len, n_features)
 
-        print(f"Scaled training data: {X_train_scaled.shape}")
-        print(f"Scaled test data: {X_test_scaled.shape}")
-
         return X_train_scaled, X_test_scaled
 
     def build_model(self, learning_rate=0.001):
-        """
-        Build LSTM model architecture.
-        """
-        print("Building LSTM model...")
-
         model = Sequential([
             # First LSTM layer - Bidirectional for better context
             Bidirectional(LSTM(128, return_sequences=True,
@@ -142,18 +113,11 @@ class LSTMTheftDetector:
         )
 
         self.model = model
-
-        print("\nModel Summary:")
         model.summary()
 
         return model
 
     def train(self, X_train, y_train, X_val, y_val, epochs=50, batch_size=32):
-        """
-        Train the LSTM model with callbacks.
-        """
-        print("\nTraining model...")
-
         early_stop = EarlyStopping(
             monitor='val_loss',
             patience=10,
@@ -192,7 +156,6 @@ class LSTMTheftDetector:
         return self.history
 
     def _compute_class_weights(self, y):
-        """Compute class weights for imbalanced data"""
         from sklearn.utils.class_weight import compute_class_weight
 
         classes = np.unique(y)
@@ -204,21 +167,13 @@ class LSTMTheftDetector:
         return class_weight_dict
 
     def evaluate(self, X_test, y_test):
-
-        print("\n" + "=" * 50)
-        print("EVALUATION RESULTS")
-        print("=" * 50)
-
         y_pred_proba = self.model.predict(X_test, verbose=0)
         y_pred = (y_pred_proba > 0.5).astype(int).flatten()
 
-        # Classification report
-        print("\nClassification Report:")
         print(classification_report(y_test, y_pred,
                                     target_names=['Normal', 'Shoplifting'],
                                     digits=4))
 
-        # Confusion matrix
         cm = confusion_matrix(y_test, y_pred)
         print("\nConfusion Matrix:")
         print(cm)
@@ -227,11 +182,9 @@ class LSTMTheftDetector:
         print(f"False Negatives: {cm[1,0]} (Shoplifting classified as Normal)")
         print(f"True Positives: {cm[1,1]}")
 
-        # ROC-AUC
         auc = roc_auc_score(y_test, y_pred_proba)
         print(f"\nROC-AUC Score: {auc:.4f}")
 
-        # Create visualizations
         self._plot_training_history()
         self._plot_confusion_matrix(cm)
         self._plot_roc_curve(y_test, y_pred_proba)
@@ -247,52 +200,50 @@ class LSTMTheftDetector:
     def _plot_training_history(self):
         if self.history is None:
             return
+        metrics = {
+            "accuracy": {
+                "train": "accuracy",
+                "val": "val_accuracy",
+                "title": "Model Accuracy",
+                "ylabel": "Accuracy",
+                "filename": "accuracy.png"
+            },
+            "loss": {
+                "train": "loss",
+                "val": "val_loss",
+                "title": "Model Loss",
+                "ylabel": "Loss",
+                "filename": "loss.png"
+            },
+            "precision": {
+                "train": "precision",
+                "val": "val_precision",
+                "title": "Model Precision",
+                "ylabel": "Precision",
+                "filename": "precision.png"
+            },
+            "recall": {
+                "train": "recall",
+                "val": "val_recall",
+                "title": "Model Recall",
+                "ylabel": "Recall",
+                "filename": "recall.png"
+            }
+        }
 
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        for key, m in metrics.items():
+            plt.figure(figsize=(7, 5))
+            plt.plot(self.history.history[m["train"]], label='Train')
+            plt.plot(self.history.history[m["val"]], label='Validation')
+            plt.title(m["title"])
+            plt.xlabel('Epoch')
+            plt.ylabel(m["ylabel"])
+            plt.legend()
+            plt.grid(True)
 
-        # Accuracy
-        axes[0, 0].plot(self.history.history['accuracy'], label='Train')
-        axes[0, 0].plot(self.history.history['val_accuracy'],
-                        label='Validation')
-        axes[0, 0].set_title('Model Accuracy')
-        axes[0, 0].set_xlabel('Epoch')
-        axes[0, 0].set_ylabel('Accuracy')
-        axes[0, 0].legend()
-        axes[0, 0].grid(True)
-
-        # Loss
-        axes[0, 1].plot(self.history.history['loss'], label='Train')
-        axes[0, 1].plot(self.history.history['val_loss'], label='Validation')
-        axes[0, 1].set_title('Model Loss')
-        axes[0, 1].set_xlabel('Epoch')
-        axes[0, 1].set_ylabel('Loss')
-        axes[0, 1].legend()
-        axes[0, 1].grid(True)
-
-        # Precision
-        axes[1, 0].plot(self.history.history['precision'], label='Train')
-        axes[1, 0].plot(self.history.history['val_precision'],
-                        label='Validation')
-        axes[1, 0].set_title('Model Precision')
-        axes[1, 0].set_xlabel('Epoch')
-        axes[1, 0].set_ylabel('Precision')
-        axes[1, 0].legend()
-        axes[1, 0].grid(True)
-
-        # Recall
-        axes[1, 1].plot(self.history.history['recall'], label='Train')
-        axes[1, 1].plot(self.history.history['val_recall'], label='Validation')
-        axes[1, 1].set_title('Model Recall')
-        axes[1, 1].set_xlabel('Epoch')
-        axes[1, 1].set_ylabel('Recall')
-        axes[1, 1].legend()
-        axes[1, 1].grid(True)
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.save_dir, 'training_history.png'),
-                    dpi=300, bbox_inches='tight')
-        print("\nTraining history plot saved to training_history.png")
-        plt.close()
+            save_path = os.path.join(self.save_dir, m["filename"])
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
 
     def _plot_confusion_matrix(self, cm):
         """Plot confusion matrix"""
@@ -342,7 +293,7 @@ class LSTMTheftDetector:
 def main():
     SEQUENCE_DIR = "../../Data/Sequences"
     SEQUENCE_LENGTH = 30
-    EPOCHS = 50
+    EPOCHS = 100
     BATCH_SIZE = 32
     LEARNING_RATE = 0.001
 
@@ -357,7 +308,7 @@ def main():
         return
 
     X_train, X_temp, y_train, y_temp = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
     X_val, X_test, y_val, y_test = train_test_split(
         X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp
