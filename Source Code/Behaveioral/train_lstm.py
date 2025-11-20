@@ -75,20 +75,17 @@ class LSTMTheftDetector:
 
     def build_model(self, learning_rate=0.001):
         model = Sequential([
-            # First LSTM layer - Bidirectional for better context
-            Bidirectional(LSTM(128, return_sequences=True,
-                               kernel_regularizer=l2(0.01)),
-                          input_shape=(self.sequence_length, self.feature_dim)),
+
+            LSTM(128, return_sequences=True,
+                 kernel_regularizer=l2(0.01)),
             BatchNormalization(),
             Dropout(0.3),
 
-            # Second LSTM layer
-            Bidirectional(LSTM(64, return_sequences=True,
-                               kernel_regularizer=l2(0.01))),
+            LSTM(64, return_sequences=True,
+                 kernel_regularizer=l2(0.01)),
             BatchNormalization(),
             Dropout(0.3),
 
-            # Third LSTM layer (final)
             LSTM(32, return_sequences=False,
                  kernel_regularizer=l2(0.01)),
             BatchNormalization(),
@@ -118,12 +115,12 @@ class LSTMTheftDetector:
         return model
 
     def train(self, X_train, y_train, X_val, y_val, epochs=50, batch_size=32):
-        early_stop = EarlyStopping(
-            monitor='val_loss',
-            patience=10,
-            restore_best_weights=True,
-            verbose=1
-        )
+        # early_stop = EarlyStopping(
+        #     monitor='val_loss',
+        #     patience=10,
+        #     restore_best_weights=True,
+        #     verbose=1
+        # )
 
         checkpoint = ModelCheckpoint(
             './model/best_theft_detector_lstm.keras',
@@ -148,7 +145,7 @@ class LSTMTheftDetector:
             validation_data=(X_val, y_val),
             epochs=epochs,
             batch_size=batch_size,
-            callbacks=[early_stop, checkpoint, reduce_lr],
+            callbacks=[checkpoint, reduce_lr],
             class_weight=class_weights,
             verbose=1
         )
@@ -293,7 +290,7 @@ class LSTMTheftDetector:
 def main():
     SEQUENCE_DIR = "../../Data/Sequences"
     SEQUENCE_LENGTH = 30
-    EPOCHS = 100
+    EPOCHS = 70
     BATCH_SIZE = 32
     LEARNING_RATE = 0.001
 

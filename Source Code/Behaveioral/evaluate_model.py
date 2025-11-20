@@ -310,9 +310,9 @@ class ModelEvaluator:
 
 if __name__ == "__main__":
     DATA_PATH = "../../Data/Sequences"
-    MODEL_PATH = "./best_theft_detector_lstm.keras"
+    MODEL_PATH = "./model/best_theft_detector_lstm.keras"
 
-    SCALER_PATH = "./scaler_lstm.pkl"
+    SCALER_PATH = "./scaler/scaler_lstm.pkl"
     MODEL_TYPE = 'lstm'
     SAVE_DIR = "./evaluation_results"
 
