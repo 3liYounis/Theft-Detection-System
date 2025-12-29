@@ -67,11 +67,11 @@ def collect_sequences(video_path, label, output_dir, sequence_length=30, stride=
 
 
 if __name__ == "__main__":
-    normal_dir = "../../Data/Stream/Normal - Train/"
-    shoplifting_dir = "../../Data/Stream/Shoplifting - Train/"
+    normal_dir = "../../Data/Stream/Normal/"
+    shoplifting_dir = "../../Data/Stream/Shoplifting/"
 
     sequence_output_dir = "../../Data/Sequences"
-    sequence_length = 30
+    sequence_length = 90
     stride = 10
 
     total_sequences = 0

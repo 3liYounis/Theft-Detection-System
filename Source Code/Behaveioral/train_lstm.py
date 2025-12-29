@@ -18,6 +18,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
+
+
+
 class LSTMTheftDetector:
     def __init__(self, sequence_length=30, feature_dim=None, save_dir="./training_results"):
         self.sequence_length = sequence_length
@@ -76,7 +79,7 @@ class LSTMTheftDetector:
     def build_model(self, learning_rate=0.001):
         model = Sequential([
 
-            LSTM(128, return_sequences=True,
+            LSTM(128, return_sequences=True, input_shape=(self.sequence_length, self.feature_dim),
                  kernel_regularizer=l2(0.01)),
             BatchNormalization(),
             Dropout(0.3),
@@ -114,7 +117,7 @@ class LSTMTheftDetector:
 
         return model
 
-    def train(self, X_train, y_train, X_val, y_val, epochs=50, batch_size=32):
+    def train(self, X_train, y_train, X_val, y_val, X_test=None, y_test=None, epochs=50, batch_size=32):
         # early_stop = EarlyStopping(
         #     monitor='val_loss',
         #     patience=10,
@@ -140,12 +143,23 @@ class LSTMTheftDetector:
 
         class_weights = self._compute_class_weights(y_train)
 
+
+        callbacks_list = [checkpoint, reduce_lr]
+        
+        def on_epoch_end(epoch, logs):
+            results = self.model.evaluate(X_test, y_test, verbose=0)
+            metric_names = ['loss', 'accuracy', 'precision', 'recall', 'auc']
+            for name, value in zip(metric_names, results):
+                logs[f'test_{name}'] = value
+        
+        callbacks_list.append(keras.callbacks.LambdaCallback(on_epoch_end=on_epoch_end))
+
         self.history = self.model.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
             epochs=epochs,
             batch_size=batch_size,
-            callbacks=[checkpoint, reduce_lr],
+            callbacks=callbacks_list,
             class_weight=class_weights,
             verbose=1
         )
@@ -201,6 +215,7 @@ class LSTMTheftDetector:
             "accuracy": {
                 "train": "accuracy",
                 "val": "val_accuracy",
+                "test": "test_accuracy",
                 "title": "Model Accuracy",
                 "ylabel": "Accuracy",
                 "filename": "accuracy.png"
@@ -208,6 +223,7 @@ class LSTMTheftDetector:
             "loss": {
                 "train": "loss",
                 "val": "val_loss",
+                "test": "test_loss",
                 "title": "Model Loss",
                 "ylabel": "Loss",
                 "filename": "loss.png"
@@ -215,6 +231,7 @@ class LSTMTheftDetector:
             "precision": {
                 "train": "precision",
                 "val": "val_precision",
+                "test": "test_precision",
                 "title": "Model Precision",
                 "ylabel": "Precision",
                 "filename": "precision.png"
@@ -222,16 +239,30 @@ class LSTMTheftDetector:
             "recall": {
                 "train": "recall",
                 "val": "val_recall",
+                "test": "test_recall",
                 "title": "Model Recall",
                 "ylabel": "Recall",
                 "filename": "recall.png"
+            },
+            "auc": {
+                "train": "auc",
+                "val": "val_auc",
+                "test": "test_auc",
+                "title": "Model AUC",
+                "ylabel": "AUC",
+                "filename": "auc.png"
             }
         }
 
         for key, m in metrics.items():
-            plt.figure(figsize=(7, 5))
-            plt.plot(self.history.history[m["train"]], label='Train')
-            plt.plot(self.history.history[m["val"]], label='Validation')
+            plt.figure(figsize=(10, 6))
+            plt.plot(self.history.history[m["train"]], label='Train', color='blue')
+            plt.plot(self.history.history[m["val"]], label='Validation', color='orange')
+            
+            test_key = f"test_{key}"
+            if test_key in self.history.history:
+                plt.plot(self.history.history[test_key], label='Test', color='green', linestyle='--')
+            
             plt.title(m["title"])
             plt.xlabel('Epoch')
             plt.ylabel(m["ylabel"])
@@ -248,7 +279,7 @@ class LSTMTheftDetector:
         sns.heatmap(cm, annot=True, fmt='d', cmap='Reds',
                     xticklabels=['Normal', 'Shoplifting'],
                     yticklabels=['Normal', 'Shoplifting'])
-        plt.title('Confusion Matrix')
+        plt.title('Test Confusion Matrix')
         plt.ylabel('True Label')
         plt.xlabel('Predicted Label')
         plt.savefig(os.path.join(self.save_dir, 'confusion_matrix.png'),
@@ -266,7 +297,7 @@ class LSTMTheftDetector:
         plt.plot([0, 1], [0, 1], 'k--', label='Random Classifier')
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title('ROC Curve')
+        plt.title('Test ROC Curve')
         plt.legend()
         plt.grid(True)
         plt.savefig(os.path.join(self.save_dir, 'roc_curve.png'),
@@ -289,10 +320,10 @@ class LSTMTheftDetector:
 
 def main():
     SEQUENCE_DIR = "../../Data/Sequences"
-    SEQUENCE_LENGTH = 30
-    EPOCHS = 70
-    BATCH_SIZE = 32
-    LEARNING_RATE = 0.001
+    SEQUENCE_LENGTH = 90
+    EPOCHS = 50
+    BATCH_SIZE = 20
+    LEARNING_RATE = 0.0001
 
     detector = LSTMTheftDetector(sequence_length=SEQUENCE_LENGTH)
 
@@ -322,7 +353,8 @@ def main():
 
     detector.build_model(learning_rate=LEARNING_RATE)
 
-    detector.train(X_train_scaled, y_train, X_val_scaled, y_val,
+    detector.train(X_train_scaled, y_train, X_val_scaled, y_val, 
+                   X_test=X_test_scaled, y_test=y_test,
                    epochs=EPOCHS, batch_size=BATCH_SIZE)
     results = detector.evaluate(X_test_scaled, y_test)
 

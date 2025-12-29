@@ -6,7 +6,7 @@ import numpy as np
 import mediapipe as mp
 from tensorflow import keras
 from collections import deque
-from feature_extraction import EnhancedFeatureExtractor
+from .feature_extraction import EnhancedFeatureExtractor
 
 
 class LSTMTheftDetectorInference:
@@ -228,8 +228,9 @@ def detect_theft_lstm(video_path,
 
 
 if __name__ == "__main__":
-    video_path = "../../Data/Stream/Shoplifting - Test/Shoplifting (92).mp4"
-    # video_path = "../../Data/Stream/Normal - Test/Normal (92).mp4"
+    # video_path = "../../Data/Stream/TRY/4.mp4"
+    # video_path = "../../Data/Stream/Shoplifting/Shoplifting (92).mp4"
+    video_path = "../../Data/Stream/Normal/Normal (90).mp4"
 
     print(f"Testing LSTM detector on: {video_path}")
 
