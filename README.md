@@ -11,10 +11,7 @@ This project implements an intelligent security system that doesn't just "see" p
 ## 🎥 Demo
 Check out the system in action:
 
-<video width="100%" controls autoplay loop muted>
-  <source src="Source Code/output_main_pipeline.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[**▶️ Watch the Main Pipeline Output**](DEMO/output_main_pipeline.mp4)
 
 ---
 
