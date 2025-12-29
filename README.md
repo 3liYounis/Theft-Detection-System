@@ -11,7 +11,7 @@ This project implements an intelligent security system that doesn't just "see" p
 ## 🎥 Demo
 Check out the system in action:
 
-[**▶️ Watch the Main Pipeline Output**](DEMO/output_main_pipeline.mp4)
+[**▶️ Watch the Main Pipeline Output**](https://drive.google.com/file/d/1Pg1VaujfKTLliY3fUuezvV07L3QtNNGa/view?usp=sharing)
 
 ---
 
