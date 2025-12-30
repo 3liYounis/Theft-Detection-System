@@ -1,5 +1,4 @@
 *.mp4
-!DEMO/*.mp4
 *.pyc
 *.npz
 pose_data_enhanced.csv
