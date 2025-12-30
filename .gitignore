@@ -1,9 +1,10 @@
 *.mp4
 *.pyc
 *.npz
-pose_data_enhanced.csv
-Source Code/Deprecated/
+Deprecated/
 Source Code/Alert/serviceAccountKey.json
 portrait_database.json
 Source Code/Alert/firbaseService.py
-Data/Alert.json
+Data/
+.vscode
+Source Code/.vscode
