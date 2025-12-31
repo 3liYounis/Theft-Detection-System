@@ -6,18 +6,17 @@ import numpy as np
 import mediapipe as mp
 from tensorflow import keras
 from collections import deque
-from .feature_extraction import EnhancedFeatureExtractor
+from .feature_extraction import FeatureExtractor
 
 
 class LSTMTheftDetectorInference:
     def __init__(self, model_path='./model/theft_detector_lstm.keras',
                  scaler_path='./scaler/scaler_lstm.pkl',
-                 sequence_length=30):
-
+                 sequence_length=90):
         self.sequence_length = sequence_length
         self.model = keras.models.load_model(model_path)
         self.scaler = joblib.load(scaler_path)
-        self.feature_extractor = EnhancedFeatureExtractor(temporal_window=10)
+        self.feature_extractor = FeatureExtractor(temporal_window=10)
         self.sequence_buffer = deque(maxlen=sequence_length)
 
     def reset(self):
@@ -26,11 +25,11 @@ class LSTMTheftDetectorInference:
 
     def process_frame(self, pose_landmarks):
         if pose_landmarks is None:
-            # No pose detected - add zero features
             if len(self.sequence_buffer) > 0:
                 zero_features = np.zeros_like(self.sequence_buffer[-1])
                 self.sequence_buffer.append(zero_features)
             return None
+
         try:
             features = self.feature_extractor.extract_features(pose_landmarks)
             self.sequence_buffer.append(features)
@@ -47,7 +46,6 @@ class LSTMTheftDetectorInference:
 
         sequence = np.array(list(self.sequence_buffer))
         sequence = sequence.reshape(1, self.sequence_length, -1)
-
         n_features = sequence.shape[2]
         sequence_2d = sequence.reshape(-1, n_features)
         sequence_scaled_2d = self.scaler.transform(sequence_2d)
@@ -131,6 +129,7 @@ class LSTMTheftDetectorInference:
                         current_decision = "WARMING UP"
                         window_ratio = 0
                         decision_color = (200, 200, 0)
+
                     conf = pred_info['confidence']
                     frame_label = pred_info['label']
                     frame_color = (
@@ -162,12 +161,14 @@ class LSTMTheftDetectorInference:
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+
         video.release()
         pose.close()
         if writer:
             writer.release()
         if visualize:
             cv2.destroyAllWindows()
+
         if len(prediction_history) < decision_window * 0.3:
             theft_decision = False
             reason = "insufficient_data"

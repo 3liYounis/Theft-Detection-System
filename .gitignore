@@ -6,5 +6,6 @@ Source Code/Alert/serviceAccountKey.json
 portrait_database.json
 Source Code/Alert/firbaseService.py
 Data/
-.vscode
 Source Code/.vscode
+.vscode
+.vscode/settings.json

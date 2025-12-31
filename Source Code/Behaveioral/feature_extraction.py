@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
-class EnhancedFeatureExtractor:
+
+class FeatureExtractor:
     def __init__(self, temporal_window=10):
         self.temporal_window = temporal_window
         self.pose_history = deque(maxlen=temporal_window)
@@ -152,14 +153,10 @@ class EnhancedFeatureExtractor:
 
     def extract_features(self, pose_landmarks):
         spatial_features = self.extract_spatial_features(pose_landmarks)
-
         self.pose_history.append(spatial_features)
-
         temporal_features = self.extract_temporal_features()
-
         combined_features = np.concatenate(
             [spatial_features, temporal_features])
-
         return combined_features
 
     def _calculate_angle(self, a, b, c):
@@ -180,38 +177,50 @@ class EnhancedFeatureExtractor:
     def get_feature_names(self):
         names = []
 
-        # Body-relative coordinates (13 keypoints * 3 coords)
+        # 1. Spatial Features (56)
+        # Body-relative coordinates (13 keypoints * 3 coords = 39)
         keypoint_names = ['nose', 'l_shoulder', 'r_shoulder', 'l_elbow', 'r_elbow',
                           'l_wrist', 'r_wrist', 'l_hip', 'r_hip', 'l_knee', 'r_knee',
                           'l_ankle', 'r_ankle']
         for kp in keypoint_names:
             names.extend([f'{kp}_x', f'{kp}_y', f'{kp}_z'])
 
-        # Joint angles
+        # Joint angles (5)
         names.extend(['angle_r_elbow', 'angle_l_elbow',
-                     'angle_r_knee', 'angle_l_knee', 'angle_torso'])
+                      'angle_r_knee', 'angle_l_knee', 'angle_torso'])
 
-        # Relative distances
+        # Relative distances (6)
         names.extend(['dist_r_hand_hip', 'dist_l_hand_hip', 'hand_r_height', 'hand_l_height',
-                     'dist_r_hand_torso', 'dist_l_hand_torso'])
+                      'dist_r_hand_torso', 'dist_l_hand_torso'])
 
-        # Body configuration
+        # Body configuration (6)
         names.extend(['shoulder_width', 'hip_width', 'arm_symmetry',
-                     'head_tilt_x', 'head_tilt_y', 'torso_length'])
+                      'head_tilt_x', 'head_tilt_y', 'torso_length'])
 
-        # Temporal features
-        names.extend(['vel_r_hand_x', 'vel_r_hand_y', 'vel_r_hand_z',
-                     'vel_l_hand_x', 'vel_l_hand_y', 'vel_l_hand_z'])
-        names.extend(['acc_r_hand_x', 'acc_r_hand_y', 'acc_r_hand_z',
-                     'acc_l_hand_x', 'acc_l_hand_y', 'acc_l_hand_z'])
-        names.extend(['motion_magnitude', 'hand_motion_r', 'hand_motion_l', 'jerk_magnitude',
-                     'motion_std', 'direction_consistency'])
-        names.extend(['avg_r_hand_x', 'avg_r_hand_y', 'avg_r_hand_z',
-                     'avg_l_hand_x', 'avg_l_hand_y', 'avg_l_hand_z'])
-        names.extend(['var_r_hand_x', 'var_r_hand_y', 'var_r_hand_z'])
+        # 2. Temporal Features (30)
+        # Velocity of Elbows (Indices 9-14 of spatial) (6)
+        names.extend(['vel_l_elbow_x', 'vel_l_elbow_y', 'vel_l_elbow_z',
+                      'vel_r_elbow_x', 'vel_r_elbow_y', 'vel_r_elbow_z'])
+        
+        # Acceleration of Elbows (6)
+        names.extend(['acc_l_elbow_x', 'acc_l_elbow_y', 'acc_l_elbow_z',
+                      'acc_r_elbow_x', 'acc_r_elbow_y', 'acc_r_elbow_z'])
+        
+        # Velocity Norms (3)
+        names.extend(['vel_norm_total', 'vel_l_elbow_norm', 'vel_r_elbow_norm'])
+        
+        # Avg Position of Elbows (6)
+        names.extend(['avg_l_elbow_x', 'avg_l_elbow_y', 'avg_l_elbow_z',
+                      'avg_r_elbow_x', 'avg_r_elbow_y', 'avg_r_elbow_z'])
+        
+        # Variance of Left Elbow (Indices 9-11) (3)
+        names.extend(['var_l_elbow_x', 'var_l_elbow_y', 'var_l_elbow_z'])
+        
+        # Velocity Stats (6)
+        names.extend(['vel_std', 'vel_abs_mean', 'vel_abs_max', 
+                      'vel_abs_min', 'vel_abs_sum', 'seq_len_history'])
 
         return names
-
 
 def augment_pose_data(landmarks_array, flip=False, noise_level=0.01, scale_factor=1.0):
     augmented = landmarks_array.copy()
