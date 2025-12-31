@@ -1,24 +1,25 @@
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from tensorflow import keras
-
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional, BatchNormalization
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.regularizers import l2
-
+import io
 import os
+import time
 import glob
+import sqlite3
 import joblib
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+from feature_extraction import FeatureExtractor
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
 
-
+from tensorflow import keras
+from keras.optimizers import Adam
+from keras.regularizers import l2
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout, Bidirectional, BatchNormalization
+from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 
 
 class LSTMTheftDetector:
@@ -31,29 +32,90 @@ class LSTMTheftDetector:
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
 
-    def load_sequences(self, sequence_dir):
+    def load_sequences(self, db_path):
+        import time
         all_sequences = []
         all_labels = []
 
-        npz_files = glob.glob(os.path.join(sequence_dir, "*.npz"))
+        if not os.path.exists(db_path):
+            raise ValueError(f"Database not found at {db_path}")
 
-        if not npz_files:
-            raise ValueError(f"No .npz files found in {sequence_dir}")
+        extractor = FeatureExtractor()
+        feature_names = extractor.get_feature_names()
+        feature_columns = ", ".join(feature_names)
 
-        for npz_file in npz_files:
-            data = np.load(npz_file)
-            sequences = data['sequences']
-            labels = data['labels']
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-            all_sequences.append(sequences)
-            all_labels.append(labels)
+        print("Fetching sequence metadata from database...")
+        cursor.execute(
+            "SELECT video_name, start_frame, length, label FROM sequences")
+        sequences_meta = cursor.fetchall()
 
-            print(
-                f"Loaded {len(sequences)} sequences from {os.path.basename(npz_file)}")
+        if not sequences_meta:
+            print(f"No sequences found in database {db_path}")
+            conn.close()
+            return np.empty((0, self.sequence_length, self.feature_dim)), np.array([])
 
-        X = np.vstack(all_sequences)
-        y = np.concatenate(all_labels)
-        if self.feature_dim is None:
+        num_sequences = len(sequences_meta)
+        print(f"Found {num_sequences} sequences. Loading features...")
+
+        start_time = time.time()
+
+        sequences_by_video = {}
+        for meta in sequences_meta:
+            vname, start, length, label = meta
+            if vname not in sequences_by_video:
+                sequences_by_video[vname] = []
+            sequences_by_video[vname].append((start, length, label))
+
+        print(f"Processing {len(sequences_by_video)} videos...")
+
+        for i, (vname, seqs) in enumerate(sequences_by_video.items()):
+            max_frame = max([s + l for s, l, _ in seqs])
+
+            query = f"""
+                SELECT frame_index, {feature_columns}
+                FROM features
+                WHERE video_name = ? AND frame_index <= ?
+                ORDER BY frame_index
+            """
+            cursor.execute(query, (vname, max_frame))
+            rows = cursor.fetchall()
+
+            video_features_map = {row[0]: np.array(row[1:]) for row in rows}
+
+            for start, length, label in seqs:
+                if length != self.sequence_length:
+                    continue
+
+                seq_data = []
+                valid_seq = True
+                for j in range(length):
+                    frame_idx = start + j
+                    if frame_idx in video_features_map:
+                        seq_data.append(video_features_map[frame_idx])
+                    else:
+                        valid_seq = False
+                        break
+
+                if valid_seq:
+                    all_sequences.append(np.array(seq_data))
+                    all_labels.append(label)
+
+            if (i + 1) % 10 == 0:
+                print(
+                    f"Processed {i + 1}/{len(sequences_by_video)} videos ({time.time() - start_time:.1f}s)")
+
+        conn.close()
+
+        X = np.array(all_sequences)
+        y = np.array(all_labels)
+
+        print(f"Total loading time: {time.time() - start_time:.1f}s")
+        print(f"Loaded {len(X)} valid sequences.")
+
+        if self.feature_dim is None and len(X) > 0:
             self.feature_dim = X.shape[2]
 
         return X, y
@@ -78,7 +140,6 @@ class LSTMTheftDetector:
 
     def build_model(self, learning_rate=0.001):
         model = Sequential([
-
             LSTM(128, return_sequences=True, input_shape=(self.sequence_length, self.feature_dim),
                  kernel_regularizer=l2(0.01)),
             BatchNormalization(),
@@ -94,11 +155,9 @@ class LSTMTheftDetector:
             BatchNormalization(),
             Dropout(0.3),
 
-            # Dense layers
             Dense(16, activation='relu', kernel_regularizer=l2(0.01)),
             Dropout(0.2),
 
-            # Output layer
             Dense(1, activation='sigmoid')
         ])
 
@@ -111,10 +170,8 @@ class LSTMTheftDetector:
                      tf.keras.metrics.Recall(name='recall'),
                      tf.keras.metrics.AUC(name='auc')]
         )
-
         self.model = model
         model.summary()
-
         return model
 
     def train(self, X_train, y_train, X_val, y_val, X_test=None, y_test=None, epochs=50, batch_size=32):
@@ -142,17 +199,16 @@ class LSTMTheftDetector:
         )
 
         class_weights = self._compute_class_weights(y_train)
-
-
         callbacks_list = [checkpoint, reduce_lr]
-        
+
         def on_epoch_end(epoch, logs):
             results = self.model.evaluate(X_test, y_test, verbose=0)
             metric_names = ['loss', 'accuracy', 'precision', 'recall', 'auc']
             for name, value in zip(metric_names, results):
                 logs[f'test_{name}'] = value
-        
-        callbacks_list.append(keras.callbacks.LambdaCallback(on_epoch_end=on_epoch_end))
+
+        callbacks_list.append(
+            keras.callbacks.LambdaCallback(on_epoch_end=on_epoch_end))
 
         self.history = self.model.fit(
             X_train, y_train,
@@ -211,6 +267,7 @@ class LSTMTheftDetector:
     def _plot_training_history(self):
         if self.history is None:
             return
+
         metrics = {
             "accuracy": {
                 "train": "accuracy",
@@ -223,7 +280,6 @@ class LSTMTheftDetector:
             "loss": {
                 "train": "loss",
                 "val": "val_loss",
-                "test": "test_loss",
                 "title": "Model Loss",
                 "ylabel": "Loss",
                 "filename": "loss.png"
@@ -256,13 +312,16 @@ class LSTMTheftDetector:
 
         for key, m in metrics.items():
             plt.figure(figsize=(10, 6))
-            plt.plot(self.history.history[m["train"]], label='Train', color='blue')
-            plt.plot(self.history.history[m["val"]], label='Validation', color='orange')
-            
+            plt.plot(self.history.history[m["train"]],
+                     label='Train', color='blue')
+            plt.plot(self.history.history[m["val"]],
+                     label='Validation', color='orange')
+
             test_key = f"test_{key}"
             if test_key in self.history.history:
-                plt.plot(self.history.history[test_key], label='Test', color='green', linestyle='--')
-            
+                plt.plot(
+                    self.history.history[test_key], label='Test', color='green', linestyle='--')
+
             plt.title(m["title"])
             plt.xlabel('Epoch')
             plt.ylabel(m["ylabel"])
@@ -319,16 +378,16 @@ class LSTMTheftDetector:
 
 
 def main():
-    SEQUENCE_DIR = "../../Data/Sequences"
+    SEQUENCE_DB_PATH = "../../Data/sequences.db"
     SEQUENCE_LENGTH = 90
-    EPOCHS = 50
-    BATCH_SIZE = 20
+    EPOCHS = 80
+    BATCH_SIZE = 10
     LEARNING_RATE = 0.0001
 
     detector = LSTMTheftDetector(sequence_length=SEQUENCE_LENGTH)
 
     try:
-        X, y = detector.load_sequences(SEQUENCE_DIR)
+        X, y = detector.load_sequences(SEQUENCE_DB_PATH)
     except ValueError as e:
         print(f"\nERROR: {e}")
         print("\nPlease run data_collection_enhanced.py first to generate sequences!")
@@ -353,7 +412,7 @@ def main():
 
     detector.build_model(learning_rate=LEARNING_RATE)
 
-    detector.train(X_train_scaled, y_train, X_val_scaled, y_val, 
+    detector.train(X_train_scaled, y_train, X_val_scaled, y_val,
                    X_test=X_test_scaled, y_test=y_test,
                    epochs=EPOCHS, batch_size=BATCH_SIZE)
     results = detector.evaluate(X_test_scaled, y_test)
